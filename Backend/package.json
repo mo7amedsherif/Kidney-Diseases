@@ -1,0 +1,21 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/mo7amedsherif/Kidney-Diseases#readme",
+  "bugs": {
+    "url": "https://github.com/mo7amedsherif/Kidney-Diseases/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mo7amedsherif/Kidney-Diseases.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  }
+}

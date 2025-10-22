@@ -1,0 +1,161 @@
+[
+    {
+        "name": "Chronic Kidney Disease (CKD)",
+        "definition": "A long-term condition where the kidneys gradually lose their function over time, typically measured by a decline in the Glomerular Filtration Rate (GFR).",
+        "symptoms": [
+            "Fatigue and weakness",
+            "Swelling in ankles and feet (edema)",
+            "Nausea and poor appetite",
+            "High blood pressure",
+            "Change in urination frequency, especially at night"
+        ],
+        "causes": [
+            "Uncontrolled Diabetes Mellitus (most common)",
+            "High blood pressure (Hypertension)",
+            "Glomerulonephritis",
+            "Polycystic kidney disease"
+        ],
+        "diagnosis": [
+            "Blood tests (eGFR, creatinine)",
+            "Urine tests for albumin/protein (Albuminuria)",
+            "Kidney ultrasound"
+        ],
+        "treatment": [
+            "Strict management of blood pressure and blood sugar",
+            "Medications (e.g., ACE inhibitors or ARBs) to slow progression",
+            "Dietary changes (low salt, controlled protein intake)",
+            "Dialysis or kidney transplant in late-stage failure"
+        ],
+        "prevention": [
+            "Regular monitoring of blood pressure and blood sugar",
+            "Maintaining a healthy weight and diet",
+            "Avoiding overuse of non-steroidal anti-inflammatory drugs (NSAIDs)"
+        ]
+    },
+    {
+        "name": "Acute Kidney Injury (AKI)",
+        "definition": "A sudden, rapid decrease in kidney function that develops over hours or days, often reversible if treated promptly.",
+        "symptoms": [
+            "Decreased urine output (Oliguria)",
+            "Fluid retention, causing swelling in legs",
+            "Fatigue, shortness of breath",
+            "Confusion or altered mental status",
+            "Nausea and vomiting"
+        ],
+        "causes": [
+            "Severe dehydration or blood loss",
+            "Sepsis (severe infection)",
+            "Toxins or certain medications (Nephrotoxic drugs)",
+            "Blockage of the urinary tract (e.g., severe kidney stones)"
+        ],
+        "diagnosis": [
+            "Rapid increase in serum creatinine and BUN",
+            "Urine analysis (examining for casts/protein)",
+            "Renal ultrasound"
+        ],
+        "treatment": [
+            "Treating the underlying cause (e.g., fighting infection, restoring fluid balance)",
+            "Stopping any nephrotoxic medications",
+            "Temporary dialysis if fluid/electrolyte levels are critical"
+        ],
+        "prevention": [
+            "Maintaining adequate hydration, especially when ill",
+            "Careful monitoring of medications in high-risk patients",
+            "Prompt treatment of severe infections"
+        ]
+    },
+    {
+        "name": "Kidney Stones (Nephrolithiasis)",
+        "definition": "Hard deposits made of minerals and salts that form inside the kidneys, often causing severe pain as they travel through the urinary tract.",
+        "symptoms": [
+            "Severe, sharp pain in the side and back (flank pain)",
+            "Pain that radiates to the lower abdomen and groin",
+            "Blood in the urine (hematuria)",
+            "Nausea and vomiting",
+            "Pain during urination (dysuria)"
+        ],
+        "causes": [
+            "Low water intake (most common)",
+            "High intake of salt, sugar, and animal protein",
+            "Obesity and certain digestive diseases",
+            "Genetic and metabolic disorders"
+        ],
+        "diagnosis": [
+            "Non-contrast CT scan (most accurate)",
+            "Urinalysis",
+            "Ultrasound"
+        ],
+        "treatment": [
+            "Increased fluid intake and pain management for small stones",
+            "Medications to help pass the stone",
+            "Shock wave lithotripsy (ESWL) for breaking stones",
+            "Ureteroscopy or surgery for large stones"
+        ],
+        "prevention": [
+            "Drinking plenty of water (2.5L-3L per day)",
+            "Reducing salt and high-oxalate foods (e.g., spinach, nuts)",
+            "Maintaining a balanced diet"
+        ]
+    },
+    {
+        "name": "Diabetic Nephropathy",
+        "definition": "A complication of long-term diabetes, where high blood sugar damages the small filtering units in the kidneys (glomeruli), leading to kidney failure.",
+        "symptoms": [
+            "Foamy or bubbly urine due to excessive protein (albuminuria)",
+            "Swelling in the feet, ankles, and hands",
+            "Increased need to urinate at night",
+            "Unexplained fatigue",
+            "High blood pressure that is difficult to control"
+        ],
+        "causes": [
+            "Sustained high blood sugar levels (Hyperglycemia)",
+            "Long duration of diabetes (Type 1 or Type 2)",
+            "Uncontrolled high blood pressure"
+        ],
+        "diagnosis": [
+            "Urine Albumin-to-Creatinine Ratio (UACR)",
+            "Blood tests for eGFR and creatinine",
+            "Routine blood pressure monitoring"
+        ],
+        "treatment": [
+            "Achieving strict blood glucose control (HbA1c targets)",
+            "Aggressive blood pressure control using ACE inhibitors or ARBs",
+            "Dietary management (low salt and controlled protein)"
+        ],
+        "prevention": [
+            "Regular monitoring and strict control of blood sugar",
+            "Maintaining blood pressure within recommended targets",
+            "Annual screening for albuminuria"
+        ]
+    },
+    {
+        "name": "Pyelonephritis (Kidney Infection)",
+        "definition": "A bacterial infection of the kidney, often starting as a Urinary Tract Infection (UTI) that travels up to the kidney.",
+        "symptoms": [
+            "High fever and chills",
+            "Severe pain in the back or side (flank pain)",
+            "Nausea and vomiting",
+            "Frequent, painful, and urgent urination"
+        ],
+        "causes": [
+            "Bacterial infection (E. coli most common) ascending from the bladder",
+            "Obstruction in the urinary tract (e.g., stones or enlarged prostate)",
+            "Vesicoureteral reflux (urine flowing backward)"
+        ],
+        "diagnosis": [
+            "Urine culture and sensitivity test",
+            "Blood tests (checking for elevated white blood cells)",
+            "Ultrasound or CT scan if obstruction is suspected"
+        ],
+        "treatment": [
+            "Antibiotics (often intravenously initially for severe cases)",
+            "Adequate hydration",
+            "Pain management"
+        ],
+        "prevention": [
+            "Prompt and complete treatment of lower UTIs",
+            "Maintaining good hygiene",
+            "Drinking sufficient fluids"
+        ]
+    }
+]
