@@ -21,7 +21,10 @@ userSchema=mongoose.Schema({
         type:String,
         // required:true,
         // enum:['male','female'] 
-        }
+        },
+    birthDate:{
+        type:Date,
+        default:Date.now }  
 });    
 
 module.exports=mongoose.model('User',userSchema);
