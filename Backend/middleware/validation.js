@@ -22,7 +22,7 @@ const registerValidation = [
         }
         return true;
     }),
-    // body('gender').isIn(['male','female']).withMessage('Gender must be either male or female'),
+    body('gender').isIn(['male','female']).withMessage('Gender must be either male or female'),
     body('birthDate')
         .optional().isISO8601().withMessage('Invalid date format, use YYYY-MM-DD')
         .custom((value) => {

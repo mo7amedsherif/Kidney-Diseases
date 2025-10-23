@@ -19,8 +19,8 @@ userSchema=mongoose.Schema({
         required:true },
     gender:{
         type:String,
-        // required:true,
-        // enum:['male','female'] 
+        required:true,
+        enum:['male','female'] 
         },
     birthDate:{
         type:Date,
