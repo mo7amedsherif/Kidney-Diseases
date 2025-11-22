@@ -1,5 +1,4 @@
 
-const mongoose = require("mongoose");
 const User = require("../module/user.model");
 const responseFormatter = require("../utils/responseFormatter");
 const generateToken = require("../utils/generateToken");
@@ -42,7 +41,7 @@ const registerUser = async (req, res) => {
     } catch (error) {
         res.status(500).json(responseFormatter(false, "Server Error"));
     }
-}   ;
+};
 
 const loginUser = async (req, res) => {
     try {
