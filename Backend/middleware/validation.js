@@ -17,7 +17,6 @@ const registerValidation = [
     body('lastName').notEmpty().withMessage('Last name is required').isLength({ min: 2, max: 30 }).withMessage('Last name must between 2 and 30 characters'),
     body('email').isEmail().withMessage('Invalid email format'),
     body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
-    body('gender').isIn(['male','female']).withMessage('Gender must be either male or female'),
     validateRequest
 ];
 module.exports = { registerValidation };
