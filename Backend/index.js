@@ -14,6 +14,7 @@ connectDB();
 // Import routes
 const userRoutes = require('./routes/user.routes');
 
+
 // Use user routes
 app.use('/api/users', userRoutes);
 
