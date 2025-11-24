@@ -17,6 +17,7 @@ router.post('/register', registerValidation, registerUser);
 router.post('/login', loginUser);
 
 // GET route for user profile (protected)
+router.get('/profile:id', verifyToken, getUserProfile);
 router.get('/profile', verifyToken, getUserProfile);
 
 module.exports = router;

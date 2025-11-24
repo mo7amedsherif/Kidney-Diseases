@@ -5,6 +5,7 @@ const bcrypt = require("bcryptjs");
 
 const getUserProfile = async (req, res) => {
     try {
+        let id=req.params.id;
         const user = await User.findById(req.user.id).select("-password");
         if (user) {
             res.status(200).json(responseFormatter(true, "User profile fetched successfully", user));
@@ -15,10 +16,19 @@ const getUserProfile = async (req, res) => {
         res.status(500).json(responseFormatter(false, "Server Error"));
     }
 };
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find().select("-password");
+        res.status(200).json(responseFormatter(true, "Users fetched successfully", users));
+    } catch (error) {
+        res.status(500).json(responseFormatter(false, "Server Error"));
+    }
+};
+
 
 const registerUser = async (req, res) => {
     try {
-        const { firstName, lastName, email, password, gender} = req.body;
+        const { firstName, lastName, email, password, gender,role} = req.body;
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json(responseFormatter(false, "User already exists"));
@@ -52,6 +62,8 @@ const loginUser = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email,
                 gender: user.gender,
+                id: user._id,
+                role: user.role,
                 token: generateToken(user._id, user.role)
             }));
         } else {
