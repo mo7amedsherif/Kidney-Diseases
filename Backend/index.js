@@ -13,10 +13,14 @@ connectDB();
 
 // Import routes
 const userRoutes = require('./routes/user.routes');
+const diagnoseRoutes = require('./routes/diagnose.route');
 
 
 // Use user routes
 app.use('/api/users', userRoutes);
+
+// Use diagnose routes
+app.use('/api/diagnose', diagnoseRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
