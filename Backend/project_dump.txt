@@ -1,5 +1,5 @@
 Project Structure & Code Dump
-Generated on: 2025-11-24T01:43:08.364Z
+Generated on: 2025-11-24T19:12:49.893Z
 
 
 ================================================================================
@@ -70,21 +70,21 @@ const diagnoseDisease = async (req, res) => {
             // Extract predicted disease and confidence from ML API response
             // Handle different possible response formats
             if (mlApiResponse.data) {
-                predictedDisease = mlApiResponse.data.disease || 
-                                 mlApiResponse.data.predicted_disease || 
-                                 mlApiResponse.data.prediction;
-                confidence = mlApiResponse.data.confidence || 
-                           mlApiResponse.data.confidence_score || 
-                           0;
+                predictedDisease = mlApiResponse.data.disease ||
+                    mlApiResponse.data.predicted_disease ||
+                    mlApiResponse.data.prediction;
+                confidence = mlApiResponse.data.confidence ||
+                    mlApiResponse.data.confidence_score ||
+                    0;
             } else {
                 throw new Error("Invalid response from ML API: empty response");
             }
         } catch (mlApiError) {
             // If ML API fails, still save the symptoms but return error
             console.error("ML API Error:", mlApiError.message);
-            
+
             // Check if it's a network error or API error
-            const errorMessage = mlApiError.response 
+            const errorMessage = mlApiError.response
                 ? `ML API returned error: ${mlApiError.response.status} - ${mlApiError.response.statusText}`
                 : mlApiError.message;
 
@@ -159,8 +159,30 @@ const diagnoseDisease = async (req, res) => {
     }
 };
 
+const getDiagnosisHistory = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Get all diagnoses for the logged-in user
+        const diagnoses = await Diagnosis.find({ userId })
+            .select('predictedDisease confidence symptoms createdAt userSymptomsId')
+            .sort({ createdAt: -1 }) // Most recent first
+            .populate('userSymptomsId', 'symptoms additionalNotes createdAt');
+
+        res.status(200).json(
+            responseFormatter(true, "Diagnosis history fetched successfully", diagnoses)
+        );
+    } catch (error) {
+        console.error("Get Diagnosis History Error:", error);
+        res.status(500).json(
+            responseFormatter(false, "Server Error: " + error.message)
+        );
+    }
+};
+
 module.exports = {
-    diagnoseDisease
+    diagnoseDisease,
+    getDiagnosisHistory
 };
 
 
@@ -175,13 +197,48 @@ FILE PATH: controller\diseases.controller.js
 ================================================================================
 FILE PATH: controller\symptoms.controller.js
 ================================================================================
+const responseFormatter = require("../utils/responseFormatter");
+
+// Define the exact symptom keys and their display names
+const SYMPTOM_LIST = [
+    { key: "back_pain", name: "Back Pain", description: "Pain in the back area" },
+    { key: "swelling", name: "Swelling", description: "Abnormal swelling in body parts" },
+    { key: "low_urine", name: "Low Urine Output", description: "Decreased urine production" },
+    { key: "fever", name: "Fever", description: "Elevated body temperature" },
+    { key: "blood_in_urine", name: "Blood in Urine", description: "Presence of blood in urine" },
+    { key: "nausea", name: "Nausea", description: "Feeling of sickness with inclination to vomit" },
+    { key: "vomiting", name: "Vomiting", description: "Forceful expulsion of stomach contents" },
+    { key: "fatigue", name: "Fatigue", description: "Extreme tiredness or exhaustion" },
+    { key: "loss_of_appetite", name: "Loss of Appetite", description: "Reduced desire to eat" },
+    { key: "burning_urination", name: "Burning Urination", description: "Pain or burning sensation during urination" },
+    { key: "dark_urine", name: "Dark Urine", description: "Unusually dark colored urine" },
+    { key: "abdomen_pain", name: "Abdomen Pain", description: "Pain in the abdominal area" }
+];
+
+const getAllSymptoms = async (req, res) => {
+    try {
+        // Return the symptom list for frontend and AI model
+        res.status(200).json(
+            responseFormatter(true, "Symptoms list fetched successfully", SYMPTOM_LIST)
+        );
+    } catch (error) {
+        console.error("Get Symptoms Error:", error);
+        res.status(500).json(
+            responseFormatter(false, "Server Error: " + error.message)
+        );
+    }
+};
+
+module.exports = {
+    getAllSymptoms
+};
+
 
 
 
 ================================================================================
 FILE PATH: controller\user.controller.js
 ================================================================================
-
 const User = require("../models/user.model");
 const responseFormatter = require("../utils/responseFormatter");
 const generateToken = require("../utils/generateToken");
@@ -189,20 +246,20 @@ const bcrypt = require("bcryptjs");
 
 const getUserProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select("-password");  
+        const user = await User.findById(req.user.id).select("-password");
         if (user) {
             res.status(200).json(responseFormatter(true, "User profile fetched successfully", user));
         } else {
             res.status(404).json(responseFormatter(false, "User not found"));
-        }   
+        }
     } catch (error) {
         res.status(500).json(responseFormatter(false, "Server Error"));
-    }   
+    }
 };
 
 const registerUser = async (req, res) => {
     try {
-        const { firstName, lastName, email, password, gender, role } = req.body;
+        const { firstName, lastName, email, password, gender} = req.body;
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json(responseFormatter(false, "User already exists"));
@@ -234,16 +291,16 @@ const loginUser = async (req, res) => {
             res.status(200).json(responseFormatter(true, "User logged in successfully", {
                 firstName: user.firstName,
                 lastName: user.lastName,
-                email: user.email, 
+                email: user.email,
                 gender: user.gender,
-                token: generateToken(user._id,user.role)
+                token: generateToken(user._id, user.role)
             }));
         } else {
             res.status(401).json(responseFormatter(false, "Invalid email or password"));
-        }   
+        }
     } catch (error) {
         res.status(500).json(responseFormatter(false, "Server Error"));
-    }   
+    }
 };
 
 module.exports = {
@@ -258,29 +315,26 @@ module.exports = {
 ================================================================================
 FILE PATH: index.js
 ================================================================================
-// Import and configure dotenv at the top
-require('dotenv').config();
-
 const express = require('express');
 const app = express();
 const connectDB = require('./config/connection');
-
-// Middleware - Crucial for parsing JSON bodies
-app.use(express.json());
-
-// Connect to database
-connectDB();
-
-// Import routes
+const cors = require('cors');
 const userRoutes = require('./routes/user.routes');
 const diagnoseRoutes = require('./routes/diagnose.route');
-
+const symptomRoutes = require('./routes/symptom.route');
+require('dotenv').config();
+app.use(cors());
+app.use(express.json());
+connectDB();
 
 // Use user routes
 app.use('/api/users', userRoutes);
 
 // Use diagnose routes
 app.use('/api/diagnose', diagnoseRoutes);
+
+// Use symptom routes
+app.use('/api/symptoms', symptomRoutes);
 
 // Start server
 const PORT = process.env.PORT || 3000;
@@ -299,38 +353,28 @@ const validateDiagnosisInput = (req, res, next) => {
     try {
         const { symptoms } = req.body;
 
-        // Check if symptoms exists
         if (!symptoms) {
             return res.status(400).json(
                 responseFormatter(false, "Symptoms object is required")
             );
         }
-
-        // Check if symptoms is an object (not array, not null, not primitive)
         if (typeof symptoms !== 'object' || Array.isArray(symptoms) || symptoms === null) {
             return res.status(400).json(
                 responseFormatter(false, "Symptoms must be an object (map) with symptom names as keys and 0 or 1 as values")
             );
         }
-
-        // Check if object is not empty
         const symptomKeys = Object.keys(symptoms);
         if (symptomKeys.length === 0) {
             return res.status(400).json(
                 responseFormatter(false, "Symptoms object cannot be empty")
             );
         }
-
-        // Validate all values are strictly numbers (0 or 1)
         for (const [key, value] of Object.entries(symptoms)) {
-            // Check if value is a number (not string, not NaN, not null, not undefined)
             if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
                 return res.status(400).json(
                     responseFormatter(false, `Symptom "${key}" must have a numeric value (0 or 1), received: ${value}`)
                 );
             }
-
-            // Check if value is strictly 0 or 1 (not 0.0, 1.0, or any other number)
             if (value !== 0 && value !== 1) {
                 return res.status(400).json(
                     responseFormatter(false, `Symptom "${key}" must have a value of exactly 0 or 1, received: ${value}`)
@@ -338,7 +382,7 @@ const validateDiagnosisInput = (req, res, next) => {
             }
         }
 
-        // Validation passed
+
         next();
     } catch (error) {
         return res.status(500).json(
@@ -355,20 +399,13 @@ module.exports = {
 
 
 ================================================================================
-FILE PATH: middleware\errorHandelr.js
-================================================================================
-
-
-
-================================================================================
 FILE PATH: middleware\rouleStatus.middleware.js
 ================================================================================
 const jwt = require('jsonwebtoken');
-
 // 1. دالة للتحقق من أن المستخدم مسجل دخول ومعه توكن سليم
 const verifyToken = (req, res, next) => {
     // استخراج التوكن من الهيدر (عادة يكون بالشكل: Bearer xxxxx.yyyy.zzzz)
-    const authHeader = req.headers.token || req.headers.authorization;
+    const authHeader = req.headers.token || req.headers.authorization;// لسه انا هحدده 
 
     if (authHeader) {
         const token = authHeader.split(" ")[1]; // نأخذ الجزء الثاني بعد كلمة Bearer
@@ -486,14 +523,35 @@ module.exports = mongoose.model('Diagnosis', diagnosisSchema);
 
 
 ================================================================================
-FILE PATH: models\disease.model.js
-================================================================================
-
-
-
-================================================================================
 FILE PATH: models\symptom.model.js
 ================================================================================
+const mongoose = require("mongoose");
+//for 
+const symptomSchema = mongoose.Schema(
+    {
+        key: {
+            type: String,
+            required: true,
+            unique: true,
+            trim: true
+        },
+        name: {
+            type: String,
+            required: true,
+            trim: true
+        },
+        description: {
+            type: String,
+            trim: true
+        }
+    },
+    {
+        timestamps: true
+    }
+);
+
+module.exports = mongoose.model('Symptom', symptomSchema);
+
 
 
 
@@ -605,6 +663,7 @@ FILE PATH: package.json
   "dependencies": {
     "axios": "^1.13.2",
     "bcryptjs": "^3.0.3",
+    "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
     "express-validator": "^7.3.1",
@@ -622,7 +681,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import controller
-const { diagnoseDisease } = require('../controller/diagnose.controller');
+const { diagnoseDisease, getDiagnosisHistory } = require('../controller/diagnose.controller');
 
 // Import authentication middleware
 const { verifyToken } = require('../middleware/rouleStatus.middleware');
@@ -633,20 +692,28 @@ const { validateDiagnosisInput } = require('../middleware/diagnose.validation');
 // POST route for disease diagnosis (protected)
 router.post('/', verifyToken, validateDiagnosisInput, diagnoseDisease);
 
+// GET route for diagnosis history (protected)
+router.get('/history', verifyToken, getDiagnosisHistory);
+
 module.exports = router;
 
 
 
 
 ================================================================================
-FILE PATH: routes\disease.route.js
-================================================================================
-
-
-
-================================================================================
 FILE PATH: routes\symptom.route.js
 ================================================================================
+const express = require('express');
+const router = express.Router();
+
+// Import controller
+const { getAllSymptoms } = require('../controller/symptoms.controller');
+
+// GET route for symptoms list (public endpoint)
+router.get('/', getAllSymptoms);
+
+module.exports = router;
+
 
 
 
@@ -696,11 +763,7 @@ module.exports = generateToken;
 ================================================================================
 FILE PATH: utils\responseFormatter.js
 ================================================================================
-// utils/responseFormatter.js
-
-// دالة بتاخد الحالة (نجاح ولا فشل)، والرسالة، والبيانات (لو فيه)
 const formatResponse = (success, message, data = null) => {
-    // وترجعلنا كائن (Object) منسق
     return {
         success,
         message,

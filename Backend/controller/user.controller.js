@@ -1,4 +1,3 @@
-
 const User = require("../models/user.model");
 const responseFormatter = require("../utils/responseFormatter");
 const generateToken = require("../utils/generateToken");
@@ -6,20 +5,20 @@ const bcrypt = require("bcryptjs");
 
 const getUserProfile = async (req, res) => {
     try {
-        const user = await User.findById(req.user.id).select("-password");  
+        const user = await User.findById(req.user.id).select("-password");
         if (user) {
             res.status(200).json(responseFormatter(true, "User profile fetched successfully", user));
         } else {
             res.status(404).json(responseFormatter(false, "User not found"));
-        }   
+        }
     } catch (error) {
         res.status(500).json(responseFormatter(false, "Server Error"));
-    }   
+    }
 };
 
 const registerUser = async (req, res) => {
     try {
-        const { firstName, lastName, email, password, gender, role } = req.body;
+        const { firstName, lastName, email, password, gender} = req.body;
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json(responseFormatter(false, "User already exists"));
@@ -51,16 +50,16 @@ const loginUser = async (req, res) => {
             res.status(200).json(responseFormatter(true, "User logged in successfully", {
                 firstName: user.firstName,
                 lastName: user.lastName,
-                email: user.email, 
+                email: user.email,
                 gender: user.gender,
-                token: generateToken(user._id,user.role)
+                token: generateToken(user._id, user.role)
             }));
         } else {
             res.status(401).json(responseFormatter(false, "Invalid email or password"));
-        }   
+        }
     } catch (error) {
         res.status(500).json(responseFormatter(false, "Server Error"));
-    }   
+    }
 };
 
 module.exports = {

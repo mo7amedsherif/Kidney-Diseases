@@ -45,21 +45,21 @@ const diagnoseDisease = async (req, res) => {
             // Extract predicted disease and confidence from ML API response
             // Handle different possible response formats
             if (mlApiResponse.data) {
-                predictedDisease = mlApiResponse.data.disease || 
-                                 mlApiResponse.data.predicted_disease || 
-                                 mlApiResponse.data.prediction;
-                confidence = mlApiResponse.data.confidence || 
-                           mlApiResponse.data.confidence_score || 
-                           0;
+                predictedDisease = mlApiResponse.data.disease ||
+                    mlApiResponse.data.predicted_disease ||
+                    mlApiResponse.data.prediction;
+                confidence = mlApiResponse.data.confidence ||
+                    mlApiResponse.data.confidence_score ||
+                    0;
             } else {
                 throw new Error("Invalid response from ML API: empty response");
             }
         } catch (mlApiError) {
             // If ML API fails, still save the symptoms but return error
             console.error("ML API Error:", mlApiError.message);
-            
+
             // Check if it's a network error or API error
-            const errorMessage = mlApiError.response 
+            const errorMessage = mlApiError.response
                 ? `ML API returned error: ${mlApiError.response.status} - ${mlApiError.response.statusText}`
                 : mlApiError.message;
 
@@ -134,7 +134,29 @@ const diagnoseDisease = async (req, res) => {
     }
 };
 
+const getDiagnosisHistory = async (req, res) => {
+    try {
+        const userId = req.user.id;
+
+        // Get all diagnoses for the logged-in user
+        const diagnoses = await Diagnosis.find({ userId })
+            .select('predictedDisease confidence symptoms createdAt userSymptomsId')
+            .sort({ createdAt: -1 }) // Most recent first
+            .populate('userSymptomsId', 'symptoms additionalNotes createdAt');
+
+        res.status(200).json(
+            responseFormatter(true, "Diagnosis history fetched successfully", diagnoses)
+        );
+    } catch (error) {
+        console.error("Get Diagnosis History Error:", error);
+        res.status(500).json(
+            responseFormatter(false, "Server Error: " + error.message)
+        );
+    }
+};
+
 module.exports = {
-    diagnoseDisease
+    diagnoseDisease,
+    getDiagnosisHistory
 };
 

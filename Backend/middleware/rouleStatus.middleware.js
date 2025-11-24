@@ -1,9 +1,8 @@
 const jwt = require('jsonwebtoken');
-
 // 1. دالة للتحقق من أن المستخدم مسجل دخول ومعه توكن سليم
 const verifyToken = (req, res, next) => {
     // استخراج التوكن من الهيدر (عادة يكون بالشكل: Bearer xxxxx.yyyy.zzzz)
-    const authHeader = req.headers.token || req.headers.authorization;
+    const authHeader = req.headers.token || req.headers.authorization;// لسه انا هحدده 
 
     if (authHeader) {
         const token = authHeader.split(" ")[1]; // نأخذ الجزء الثاني بعد كلمة Bearer
