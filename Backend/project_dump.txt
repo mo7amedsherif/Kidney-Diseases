@@ -1,0 +1,712 @@
+Project Structure & Code Dump
+Generated on: 2025-11-24T01:43:08.364Z
+
+
+================================================================================
+FILE PATH: config\connection.js
+================================================================================
+// getting-started.js
+const mongoose = require('mongoose');
+
+const connectDB = async () => {
+  try{
+    await mongoose.connect('mongodb://127.0.0.1:27017/GradP')
+    console.log('MongoDB connected successfully');
+  }
+  catch (err) {
+    console.error('Database connection error:',err);
+  }
+}
+module.exports = connectDB;
+
+
+================================================================================
+FILE PATH: controller\diagnose.controller.js
+================================================================================
+const UserSymptoms = require("../models/userSymptoms.model");
+const Diagnosis = require("../models/diagnosis.model");
+const responseFormatter = require("../utils/responseFormatter");
+const axios = require("axios");
+
+const diagnoseDisease = async (req, res) => {
+    try {
+        const { symptoms, additionalNotes } = req.body;
+        const userId = req.user.id;
+
+        // Step 1: Save symptoms in MongoDB (UserSymptoms collection)
+        // Symptoms is already validated by middleware as an object map with 0/1 values
+        // Example: { "fever": 1, "pain": 0, "nausea": 1 }
+        const userSymptoms = await UserSymptoms.create({
+            userId,
+            symptoms,
+            additionalNotes: additionalNotes || ""
+        });
+
+        if (!userSymptoms) {
+            return res.status(500).json(
+                responseFormatter(false, "Failed to save symptoms")
+            );
+        }
+
+        // Step 2: Send symptoms to external ML model API (Flask)
+        // Flask API expects: { "symptoms": { "fever": 1, "pain": 0 } }
+        let predictedDisease;
+        let confidence;
+
+        try {
+            const mlApiResponse = await axios.post(
+                "http://localhost:5000/predict",
+                {
+                    symptoms: symptoms  // Send the symptoms object map directly
+                },
+                {
+                    timeout: 10000, // 10 seconds timeout
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
+
+            // Extract predicted disease and confidence from ML API response
+            // Handle different possible response formats
+            if (mlApiResponse.data) {
+                predictedDisease = mlApiResponse.data.disease || 
+                                 mlApiResponse.data.predicted_disease || 
+                                 mlApiResponse.data.prediction;
+                confidence = mlApiResponse.data.confidence || 
+                           mlApiResponse.data.confidence_score || 
+                           0;
+            } else {
+                throw new Error("Invalid response from ML API: empty response");
+            }
+        } catch (mlApiError) {
+            // If ML API fails, still save the symptoms but return error
+            console.error("ML API Error:", mlApiError.message);
+            
+            // Check if it's a network error or API error
+            const errorMessage = mlApiError.response 
+                ? `ML API returned error: ${mlApiError.response.status} - ${mlApiError.response.statusText}`
+                : mlApiError.message;
+
+            return res.status(503).json(
+                responseFormatter(false, "ML prediction service is currently unavailable. Symptoms have been saved.", {
+                    userSymptomsId: userSymptoms._id,
+                    error: errorMessage
+                })
+            );
+        }
+
+        // Validate ML API response
+        if (!predictedDisease || typeof predictedDisease !== 'string' || predictedDisease.trim() === '') {
+            return res.status(500).json(
+                responseFormatter(false, "Invalid response from ML API: missing or invalid disease prediction")
+            );
+        }
+
+        // Validate confidence is a number between 0 and 100
+        const confidenceNum = Number(confidence);
+        if (isNaN(confidenceNum) || confidenceNum < 0 || confidenceNum > 100) {
+            console.warn(`Invalid confidence value received: ${confidence}, defaulting to 0`);
+            confidence = 0;
+        } else {
+            confidence = confidenceNum;
+        }
+
+        // Step 3: Save the diagnosis in Diagnosis collection
+        // Extract ONLY the keys where value is 1 (active symptoms) from the symptoms map
+        // Example: { "fever": 1, "pain": 0, "nausea": 1 } -> ["fever", "nausea"]
+        const activeSymptoms = Object.keys(symptoms).filter(key => symptoms[key] === 1);
+
+        // Ensure we have at least one active symptom
+        if (activeSymptoms.length === 0) {
+            return res.status(400).json(
+                responseFormatter(false, "At least one active symptom (value = 1) is required for diagnosis")
+            );
+        }
+
+        const diagnosis = await Diagnosis.create({
+            userId,
+            userSymptomsId: userSymptoms._id,
+            predictedDisease: predictedDisease.trim(),
+            confidence: confidence,
+            symptoms: activeSymptoms
+        });
+
+        if (!diagnosis) {
+            return res.status(500).json(
+                responseFormatter(false, "Failed to save diagnosis")
+            );
+        }
+
+        // Step 4: Return the result back to the frontend
+        // Return activeSymptoms list so the user sees what they were diagnosed based on
+        res.status(200).json(
+            responseFormatter(true, "Diagnosis completed successfully", {
+                diagnosisId: diagnosis._id,
+                predictedDisease: diagnosis.predictedDisease,
+                confidence: diagnosis.confidence,
+                activeSymptoms: activeSymptoms,  // Array of symptom names with value = 1
+                userSymptomsId: userSymptoms._id,
+                createdAt: diagnosis.createdAt
+            })
+        );
+
+    } catch (error) {
+        console.error("Diagnosis Error:", error);
+        res.status(500).json(
+            responseFormatter(false, "Server Error: " + error.message)
+        );
+    }
+};
+
+module.exports = {
+    diagnoseDisease
+};
+
+
+
+
+================================================================================
+FILE PATH: controller\diseases.controller.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: controller\symptoms.controller.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: controller\user.controller.js
+================================================================================
+
+const User = require("../models/user.model");
+const responseFormatter = require("../utils/responseFormatter");
+const generateToken = require("../utils/generateToken");
+const bcrypt = require("bcryptjs");
+
+const getUserProfile = async (req, res) => {
+    try {
+        const user = await User.findById(req.user.id).select("-password");  
+        if (user) {
+            res.status(200).json(responseFormatter(true, "User profile fetched successfully", user));
+        } else {
+            res.status(404).json(responseFormatter(false, "User not found"));
+        }   
+    } catch (error) {
+        res.status(500).json(responseFormatter(false, "Server Error"));
+    }   
+};
+
+const registerUser = async (req, res) => {
+    try {
+        const { firstName, lastName, email, password, gender, role } = req.body;
+        const userExists = await User.findOne({ email });
+        if (userExists) {
+            return res.status(400).json(responseFormatter(false, "User already exists"));
+        }
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(password, salt);
+        const user = await User.create({ firstName, lastName, email, password: hashedPassword, gender, role });
+        if (user) {
+            res.status(201).json(responseFormatter(true, "User registered successfully", {
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email,
+                gender: user.gender,
+                token: generateToken(user._id)
+            }));
+        } else {
+            res.status(400).json(responseFormatter(false, "Invalid user data"));
+        }
+    } catch (error) {
+        res.status(500).json(responseFormatter(false, "Server Error"));
+    }
+};
+
+const loginUser = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+        if (user && (await bcrypt.compare(password, user.password))) {
+            res.status(200).json(responseFormatter(true, "User logged in successfully", {
+                firstName: user.firstName,
+                lastName: user.lastName,
+                email: user.email, 
+                gender: user.gender,
+                token: generateToken(user._id,user.role)
+            }));
+        } else {
+            res.status(401).json(responseFormatter(false, "Invalid email or password"));
+        }   
+    } catch (error) {
+        res.status(500).json(responseFormatter(false, "Server Error"));
+    }   
+};
+
+module.exports = {
+    getUserProfile,
+    registerUser,
+    loginUser
+};
+
+
+
+
+================================================================================
+FILE PATH: index.js
+================================================================================
+// Import and configure dotenv at the top
+require('dotenv').config();
+
+const express = require('express');
+const app = express();
+const connectDB = require('./config/connection');
+
+// Middleware - Crucial for parsing JSON bodies
+app.use(express.json());
+
+// Connect to database
+connectDB();
+
+// Import routes
+const userRoutes = require('./routes/user.routes');
+const diagnoseRoutes = require('./routes/diagnose.route');
+
+
+// Use user routes
+app.use('/api/users', userRoutes);
+
+// Use diagnose routes
+app.use('/api/diagnose', diagnoseRoutes);
+
+// Start server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+    console.log(`Server is running on port ${PORT}`);
+});
+
+
+
+================================================================================
+FILE PATH: middleware\diagnose.validation.js
+================================================================================
+const responseFormatter = require('../utils/responseFormatter');
+
+const validateDiagnosisInput = (req, res, next) => {
+    try {
+        const { symptoms } = req.body;
+
+        // Check if symptoms exists
+        if (!symptoms) {
+            return res.status(400).json(
+                responseFormatter(false, "Symptoms object is required")
+            );
+        }
+
+        // Check if symptoms is an object (not array, not null, not primitive)
+        if (typeof symptoms !== 'object' || Array.isArray(symptoms) || symptoms === null) {
+            return res.status(400).json(
+                responseFormatter(false, "Symptoms must be an object (map) with symptom names as keys and 0 or 1 as values")
+            );
+        }
+
+        // Check if object is not empty
+        const symptomKeys = Object.keys(symptoms);
+        if (symptomKeys.length === 0) {
+            return res.status(400).json(
+                responseFormatter(false, "Symptoms object cannot be empty")
+            );
+        }
+
+        // Validate all values are strictly numbers (0 or 1)
+        for (const [key, value] of Object.entries(symptoms)) {
+            // Check if value is a number (not string, not NaN, not null, not undefined)
+            if (typeof value !== 'number' || isNaN(value) || !isFinite(value)) {
+                return res.status(400).json(
+                    responseFormatter(false, `Symptom "${key}" must have a numeric value (0 or 1), received: ${value}`)
+                );
+            }
+
+            // Check if value is strictly 0 or 1 (not 0.0, 1.0, or any other number)
+            if (value !== 0 && value !== 1) {
+                return res.status(400).json(
+                    responseFormatter(false, `Symptom "${key}" must have a value of exactly 0 or 1, received: ${value}`)
+                );
+            }
+        }
+
+        // Validation passed
+        next();
+    } catch (error) {
+        return res.status(500).json(
+            responseFormatter(false, "Validation error: " + error.message)
+        );
+    }
+};
+
+module.exports = {
+    validateDiagnosisInput
+};
+
+
+
+
+================================================================================
+FILE PATH: middleware\errorHandelr.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: middleware\rouleStatus.middleware.js
+================================================================================
+const jwt = require('jsonwebtoken');
+
+// 1. دالة للتحقق من أن المستخدم مسجل دخول ومعه توكن سليم
+const verifyToken = (req, res, next) => {
+    // استخراج التوكن من الهيدر (عادة يكون بالشكل: Bearer xxxxx.yyyy.zzzz)
+    const authHeader = req.headers.token || req.headers.authorization;
+
+    if (authHeader) {
+        const token = authHeader.split(" ")[1]; // نأخذ الجزء الثاني بعد كلمة Bearer
+
+        jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+            if (err) {
+                return res.status(403).json("Token is not valid!");
+            }
+            // إذا كان التوكن سليم، نضع بيانات المستخدم (التي كانت داخل التوكن) في الـ Request
+            req.user = user;
+            next(); // انتقل للدالة التالية
+        });
+    } else {
+        return res.status(401).json("You are not authenticated!");
+    }
+};
+
+// 2. دالة للتحقق من أن المستخدم هو Admin
+const verifyTokenAndAdmin = (req, res, next) => {
+    verifyToken(req, res, () => {
+        // هنا نفحص الـ role الموجود داخل التوكن (تأكد أنك خزنته باسم role أو isAdmin عند إنشاء التوكن)
+        if (req.user.role === 'admin') {
+            next(); // تمام، هو أدمن، كمل
+        } else {
+            res.status(403).json("You are not allowed to do that! Admins only.");
+        }
+    });
+};
+
+module.exports = {
+    verifyToken,
+    verifyTokenAndAdmin//دا الي هستحدمه عشان احمي اي روتر 
+};
+
+
+================================================================================
+FILE PATH: middleware\user.middleware.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: middleware\validation.js
+================================================================================
+const { validationResult, body } = require('express-validator');
+const responseFormatter = require('../utils/responseFormatter');
+
+//middleware to handle validation results
+function validateRequest(req, res, next) {
+    const result = validationResult(req);
+    if (!result.isEmpty()) {
+        let errors = result.array().map(err => ({ field: err.param, message: err.msg }));
+        return res.status(400).json(responseFormatter(false, 'Validation failed', errors));
+    }
+    next();
+}
+
+//validation rules for user registration
+const registerValidation = [
+    body('firstName').notEmpty().withMessage('First name is required').isLength({ min: 2, max: 30 }).withMessage('First name must between 2 and 30 characters'),
+    body('lastName').notEmpty().withMessage('Last name is required').isLength({ min: 2, max: 30 }).withMessage('Last name must between 2 and 30 characters'),
+    body('email').isEmail().withMessage('Invalid email format'),
+    body('password').isLength({ min: 6 }).withMessage('Password must be at least 6 characters long'),
+    validateRequest
+];
+module.exports = { registerValidation };
+
+
+
+
+
+
+
+================================================================================
+FILE PATH: models\diagnosis.model.js
+================================================================================
+const mongoose = require("mongoose");
+
+const diagnosisSchema = mongoose.Schema(
+    {
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        userSymptomsId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'UserSymptoms',
+            required: true
+        },
+        predictedDisease: {
+            type: String,
+            required: true,
+            trim: true
+        },
+        confidence: {
+            type: Number,
+            required: true,
+            min: 0,
+            max: 100
+        },
+        symptoms: {
+            type: [String],
+            required: true
+        }
+    },
+    {
+        timestamps: true
+    }
+);
+
+module.exports = mongoose.model('Diagnosis', diagnosisSchema);
+
+
+
+
+================================================================================
+FILE PATH: models\disease.model.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: models\symptom.model.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: models\user.model.js
+================================================================================
+
+const mongoose = require("mongoose");
+const userSchema = mongoose.Schema(
+    {
+        firstName: {
+            type: String,
+            required: true,
+            trim: true 
+        },
+        lastName: {
+            type: String,
+            required: true,
+            trim: true
+        },
+        email: {
+            type: String,
+            required: true,
+            unique: true,
+            trim: true,
+            lowercase: true 
+        },
+        password: {
+            type: String,
+            required: true
+        },
+        gender: {
+            type: String,
+            enum: ['male', 'female'],
+            default:"male"
+        },
+        // birthDate:{
+        //    type:Date,
+        // },
+        role: {
+            type: String,
+            enum: ['user', 'admin'],
+            default: 'user' 
+        }
+    },
+    {
+        timestamps: true // . بيضيف تاريخ الإنشاء والتعديل أوتوماتيك
+    }
+);
+
+module.exports = mongoose.model('User', userSchema);
+
+
+================================================================================
+FILE PATH: models\userSymptoms.model.js
+================================================================================
+const mongoose = require("mongoose");
+
+const userSymptomsSchema = mongoose.Schema(
+    {
+        userId: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'User',
+            required: true
+        },
+        symptoms: {
+            type: Map,
+            of: Number,
+            required: true
+        },
+        additionalNotes: {
+            type: String,
+            trim: true
+        }
+    },
+    {
+        timestamps: true
+    }
+);
+
+module.exports = mongoose.model('UserSymptoms', userSymptomsSchema);
+
+
+
+
+================================================================================
+FILE PATH: package.json
+================================================================================
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "",
+  "homepage": "https://github.com/mo7amedsherif/Kidney-Diseases#readme",
+  "bugs": {
+    "url": "https://github.com/mo7amedsherif/Kidney-Diseases/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mo7amedsherif/Kidney-Diseases.git"
+  },
+  "license": "ISC",
+  "author": "",
+  "type": "commonjs",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "dependencies": {
+    "axios": "^1.13.2",
+    "bcryptjs": "^3.0.3",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0",
+    "express-validator": "^7.3.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.19.2"
+  }
+}
+
+
+
+================================================================================
+FILE PATH: routes\diagnose.route.js
+================================================================================
+const express = require('express');
+const router = express.Router();
+
+// Import controller
+const { diagnoseDisease } = require('../controller/diagnose.controller');
+
+// Import authentication middleware
+const { verifyToken } = require('../middleware/rouleStatus.middleware');
+
+// Import validation middleware
+const { validateDiagnosisInput } = require('../middleware/diagnose.validation');
+
+// POST route for disease diagnosis (protected)
+router.post('/', verifyToken, validateDiagnosisInput, diagnoseDisease);
+
+module.exports = router;
+
+
+
+
+================================================================================
+FILE PATH: routes\disease.route.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: routes\symptom.route.js
+================================================================================
+
+
+
+================================================================================
+FILE PATH: routes\user.routes.js
+================================================================================
+const express = require('express');
+const router = express.Router();
+
+// Import controller
+const { getUserProfile, registerUser, loginUser } = require('../controller/user.controller');
+
+// Import validation middleware
+const { registerValidation } = require('../middleware/validation');
+
+// Import authentication middleware
+const { verifyToken } = require('../middleware/rouleStatus.middleware');
+
+// POST route for user registration
+router.post('/register', registerValidation, registerUser);
+
+// POST route for user login
+router.post('/login', loginUser);
+
+// GET route for user profile (protected)
+router.get('/profile', verifyToken, getUserProfile);
+
+module.exports = router;
+
+
+
+
+================================================================================
+FILE PATH: utils\generateToken.js
+================================================================================
+//mohamed
+const jwt = require('jsonwebtoken');
+const generateToken = (id,role) => {
+    return jwt.sign({ id,role }, process.env.JWT_SECRET ||"token_valu_2004", {
+        expiresIn: '30d',
+    });
+}
+module.exports = generateToken;
+
+
+
+================================================================================
+FILE PATH: utils\responseFormatter.js
+================================================================================
+// utils/responseFormatter.js
+
+// دالة بتاخد الحالة (نجاح ولا فشل)، والرسالة، والبيانات (لو فيه)
+const formatResponse = (success, message, data = null) => {
+    // وترجعلنا كائن (Object) منسق
+    return {
+        success,
+        message,
+        data
+    };
+};
+
+module.exports = formatResponse;
+

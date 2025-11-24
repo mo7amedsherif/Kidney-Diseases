@@ -8,7 +8,8 @@ const userSymptomsSchema = mongoose.Schema(
             required: true
         },
         symptoms: {
-            type: [String],
+            type: Map,
+            of: Number,
             required: true
         },
         additionalNotes: {

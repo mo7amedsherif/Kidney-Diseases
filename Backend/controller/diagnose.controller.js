@@ -8,14 +8,9 @@ const diagnoseDisease = async (req, res) => {
         const { symptoms, additionalNotes } = req.body;
         const userId = req.user.id;
 
-        // Validate input
-        if (!symptoms || !Array.isArray(symptoms) || symptoms.length === 0) {
-            return res.status(400).json(
-                responseFormatter(false, "Symptoms array is required and cannot be empty")
-            );
-        }
-
         // Step 1: Save symptoms in MongoDB (UserSymptoms collection)
+        // Symptoms is already validated by middleware as an object map with 0/1 values
+        // Example: { "fever": 1, "pain": 0, "nausea": 1 }
         const userSymptoms = await UserSymptoms.create({
             userId,
             symptoms,
@@ -29,48 +24,87 @@ const diagnoseDisease = async (req, res) => {
         }
 
         // Step 2: Send symptoms to external ML model API (Flask)
+        // Flask API expects: { "symptoms": { "fever": 1, "pain": 0 } }
         let predictedDisease;
         let confidence;
 
         try {
-            const mlApiResponse = await axios.post("http://localhost:5000/predict", {
-                symptoms: symptoms
-            }, {
-                timeout: 10000 // 10 seconds timeout
-            });
+            const mlApiResponse = await axios.post(
+                "http://localhost:5000/predict",
+                {
+                    symptoms: symptoms  // Send the symptoms object map directly
+                },
+                {
+                    timeout: 10000, // 10 seconds timeout
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                }
+            );
 
             // Extract predicted disease and confidence from ML API response
+            // Handle different possible response formats
             if (mlApiResponse.data) {
-                predictedDisease = mlApiResponse.data.disease || mlApiResponse.data.predicted_disease || mlApiResponse.data.prediction;
-                confidence = mlApiResponse.data.confidence || mlApiResponse.data.confidence_score || 0;
+                predictedDisease = mlApiResponse.data.disease || 
+                                 mlApiResponse.data.predicted_disease || 
+                                 mlApiResponse.data.prediction;
+                confidence = mlApiResponse.data.confidence || 
+                           mlApiResponse.data.confidence_score || 
+                           0;
             } else {
-                throw new Error("Invalid response from ML API");
+                throw new Error("Invalid response from ML API: empty response");
             }
         } catch (mlApiError) {
             // If ML API fails, still save the symptoms but return error
             console.error("ML API Error:", mlApiError.message);
+            
+            // Check if it's a network error or API error
+            const errorMessage = mlApiError.response 
+                ? `ML API returned error: ${mlApiError.response.status} - ${mlApiError.response.statusText}`
+                : mlApiError.message;
+
             return res.status(503).json(
                 responseFormatter(false, "ML prediction service is currently unavailable. Symptoms have been saved.", {
                     userSymptomsId: userSymptoms._id,
-                    error: mlApiError.message
+                    error: errorMessage
                 })
             );
         }
 
         // Validate ML API response
-        if (!predictedDisease) {
+        if (!predictedDisease || typeof predictedDisease !== 'string' || predictedDisease.trim() === '') {
             return res.status(500).json(
-                responseFormatter(false, "Invalid response from ML API: missing disease prediction")
+                responseFormatter(false, "Invalid response from ML API: missing or invalid disease prediction")
             );
         }
 
+        // Validate confidence is a number between 0 and 100
+        const confidenceNum = Number(confidence);
+        if (isNaN(confidenceNum) || confidenceNum < 0 || confidenceNum > 100) {
+            console.warn(`Invalid confidence value received: ${confidence}, defaulting to 0`);
+            confidence = 0;
+        } else {
+            confidence = confidenceNum;
+        }
+
         // Step 3: Save the diagnosis in Diagnosis collection
+        // Extract ONLY the keys where value is 1 (active symptoms) from the symptoms map
+        // Example: { "fever": 1, "pain": 0, "nausea": 1 } -> ["fever", "nausea"]
+        const activeSymptoms = Object.keys(symptoms).filter(key => symptoms[key] === 1);
+
+        // Ensure we have at least one active symptom
+        if (activeSymptoms.length === 0) {
+            return res.status(400).json(
+                responseFormatter(false, "At least one active symptom (value = 1) is required for diagnosis")
+            );
+        }
+
         const diagnosis = await Diagnosis.create({
             userId,
             userSymptomsId: userSymptoms._id,
-            predictedDisease,
-            confidence: confidence || 0,
-            symptoms
+            predictedDisease: predictedDisease.trim(),
+            confidence: confidence,
+            symptoms: activeSymptoms
         });
 
         if (!diagnosis) {
@@ -80,12 +114,13 @@ const diagnoseDisease = async (req, res) => {
         }
 
         // Step 4: Return the result back to the frontend
+        // Return activeSymptoms list so the user sees what they were diagnosed based on
         res.status(200).json(
             responseFormatter(true, "Diagnosis completed successfully", {
                 diagnosisId: diagnosis._id,
-                predictedDisease,
-                confidence,
-                symptoms,
+                predictedDisease: diagnosis.predictedDisease,
+                confidence: diagnosis.confidence,
+                activeSymptoms: activeSymptoms,  // Array of symptom names with value = 1
                 userSymptomsId: userSymptoms._id,
                 createdAt: diagnosis.createdAt
             })
