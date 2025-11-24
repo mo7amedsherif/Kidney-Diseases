@@ -53,7 +53,7 @@ const loginUser = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email, 
                 gender: user.gender,
-                token: generateToken(user._id)
+                token: generateToken(user._id,user.role)
             }));
         } else {
             res.status(401).json(responseFormatter(false, "Invalid email or password"));
