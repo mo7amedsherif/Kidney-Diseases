@@ -1,6 +1,5 @@
 const responseFormatter = require("../utils/responseFormatter");
 
-// Define the exact symptom keys and their display names
 const SYMPTOM_LIST = [
     { key: "back_pain", name: "Back Pain", description: "Pain in the back area" },
     { key: "swelling", name: "Swelling", description: "Abnormal swelling in body parts" },
@@ -18,7 +17,6 @@ const SYMPTOM_LIST = [
 
 const getAllSymptoms = async (req, res) => {
     try {
-        // Return the symptom list for frontend and AI model
         res.status(200).json(
             responseFormatter(true, "Symptoms list fetched successfully", SYMPTOM_LIST)
         );

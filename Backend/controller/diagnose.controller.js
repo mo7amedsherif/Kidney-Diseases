@@ -30,12 +30,12 @@ const diagnoseDisease = async (req, res) => {
 
         try {
             const mlApiResponse = await axios.post(
-                "http://localhost:5000/predict",
+                "http://127.0.0.1:5000/predict",
                 {
                     symptoms: symptoms  // Send the symptoms object map directly
                 },
                 {
-                    timeout: 10000, // 10 seconds timeout
+                    timeout: 10000, // 30 seconds timeout
                     headers: {
                         'Content-Type': 'application/json'
                     }
