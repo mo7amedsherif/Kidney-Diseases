@@ -1,11 +1,11 @@
 Project Structure & Code Dump
-Generated on: 2025-11-24T19:12:49.893Z
+Generated on: 2025-12-10T15:33:52.770Z
 
 
 ================================================================================
 FILE PATH: config\connection.js
 ================================================================================
-// getting-started.js
+
 const mongoose = require('mongoose');
 
 const connectDB = async () => {
@@ -32,43 +32,31 @@ const diagnoseDisease = async (req, res) => {
     try {
         const { symptoms, additionalNotes } = req.body;
         const userId = req.user.id;
-
-        // Step 1: Save symptoms in MongoDB (UserSymptoms collection)
-        // Symptoms is already validated by middleware as an object map with 0/1 values
-        // Example: { "fever": 1, "pain": 0, "nausea": 1 }
         const userSymptoms = await UserSymptoms.create({
             userId,
             symptoms,
             additionalNotes: additionalNotes || ""
         });
-
         if (!userSymptoms) {
             return res.status(500).json(
                 responseFormatter(false, "Failed to save symptoms")
             );
         }
-
-        // Step 2: Send symptoms to external ML model API (Flask)
-        // Flask API expects: { "symptoms": { "fever": 1, "pain": 0 } }
         let predictedDisease;
         let confidence;
-
         try {
             const mlApiResponse = await axios.post(
-                "http://localhost:5000/predict",
+                "http://127.0.0.1:5000/predict",
                 {
-                    symptoms: symptoms  // Send the symptoms object map directly
+                    symptoms: symptoms
                 },
                 {
-                    timeout: 10000, // 10 seconds timeout
+                    timeout: 10000,
                     headers: {
                         'Content-Type': 'application/json'
                     }
                 }
             );
-
-            // Extract predicted disease and confidence from ML API response
-            // Handle different possible response formats
             if (mlApiResponse.data) {
                 predictedDisease = mlApiResponse.data.disease ||
                     mlApiResponse.data.predicted_disease ||
@@ -80,14 +68,10 @@ const diagnoseDisease = async (req, res) => {
                 throw new Error("Invalid response from ML API: empty response");
             }
         } catch (mlApiError) {
-            // If ML API fails, still save the symptoms but return error
             console.error("ML API Error:", mlApiError.message);
-
-            // Check if it's a network error or API error
             const errorMessage = mlApiError.response
                 ? `ML API returned error: ${mlApiError.response.status} - ${mlApiError.response.statusText}`
                 : mlApiError.message;
-
             return res.status(503).json(
                 responseFormatter(false, "ML prediction service is currently unavailable. Symptoms have been saved.", {
                     userSymptomsId: userSymptoms._id,
@@ -95,35 +79,23 @@ const diagnoseDisease = async (req, res) => {
                 })
             );
         }
-
-        // Validate ML API response
         if (!predictedDisease || typeof predictedDisease !== 'string' || predictedDisease.trim() === '') {
             return res.status(500).json(
                 responseFormatter(false, "Invalid response from ML API: missing or invalid disease prediction")
             );
         }
-
-        // Validate confidence is a number between 0 and 100
         const confidenceNum = Number(confidence);
         if (isNaN(confidenceNum) || confidenceNum < 0 || confidenceNum > 100) {
-            console.warn(`Invalid confidence value received: ${confidence}, defaulting to 0`);
             confidence = 0;
         } else {
             confidence = confidenceNum;
         }
-
-        // Step 3: Save the diagnosis in Diagnosis collection
-        // Extract ONLY the keys where value is 1 (active symptoms) from the symptoms map
-        // Example: { "fever": 1, "pain": 0, "nausea": 1 } -> ["fever", "nausea"]
         const activeSymptoms = Object.keys(symptoms).filter(key => symptoms[key] === 1);
-
-        // Ensure we have at least one active symptom
         if (activeSymptoms.length === 0) {
             return res.status(400).json(
                 responseFormatter(false, "At least one active symptom (value = 1) is required for diagnosis")
             );
         }
-
         const diagnosis = await Diagnosis.create({
             userId,
             userSymptomsId: userSymptoms._id,
@@ -131,26 +103,21 @@ const diagnoseDisease = async (req, res) => {
             confidence: confidence,
             symptoms: activeSymptoms
         });
-
         if (!diagnosis) {
             return res.status(500).json(
                 responseFormatter(false, "Failed to save diagnosis")
             );
         }
-
-        // Step 4: Return the result back to the frontend
-        // Return activeSymptoms list so the user sees what they were diagnosed based on
         res.status(200).json(
             responseFormatter(true, "Diagnosis completed successfully", {
                 diagnosisId: diagnosis._id,
                 predictedDisease: diagnosis.predictedDisease,
                 confidence: diagnosis.confidence,
-                activeSymptoms: activeSymptoms,  // Array of symptom names with value = 1
+                activeSymptoms: activeSymptoms,
                 userSymptomsId: userSymptoms._id,
                 createdAt: diagnosis.createdAt
             })
         );
-
     } catch (error) {
         console.error("Diagnosis Error:", error);
         res.status(500).json(
@@ -162,13 +129,10 @@ const diagnoseDisease = async (req, res) => {
 const getDiagnosisHistory = async (req, res) => {
     try {
         const userId = req.user.id;
-
-        // Get all diagnoses for the logged-in user
         const diagnoses = await Diagnosis.find({ userId })
             .select('predictedDisease confidence symptoms createdAt userSymptomsId')
-            .sort({ createdAt: -1 }) // Most recent first
+            .sort({ createdAt: -1 })
             .populate('userSymptomsId', 'symptoms additionalNotes createdAt');
-
         res.status(200).json(
             responseFormatter(true, "Diagnosis history fetched successfully", diagnoses)
         );
@@ -189,17 +153,10 @@ module.exports = {
 
 
 ================================================================================
-FILE PATH: controller\diseases.controller.js
-================================================================================
-
-
-
-================================================================================
 FILE PATH: controller\symptoms.controller.js
 ================================================================================
 const responseFormatter = require("../utils/responseFormatter");
 
-// Define the exact symptom keys and their display names
 const SYMPTOM_LIST = [
     { key: "back_pain", name: "Back Pain", description: "Pain in the back area" },
     { key: "swelling", name: "Swelling", description: "Abnormal swelling in body parts" },
@@ -217,7 +174,6 @@ const SYMPTOM_LIST = [
 
 const getAllSymptoms = async (req, res) => {
     try {
-        // Return the symptom list for frontend and AI model
         res.status(200).json(
             responseFormatter(true, "Symptoms list fetched successfully", SYMPTOM_LIST)
         );
@@ -246,6 +202,7 @@ const bcrypt = require("bcryptjs");
 
 const getUserProfile = async (req, res) => {
     try {
+        let id=req.params.id;
         const user = await User.findById(req.user.id).select("-password");
         if (user) {
             res.status(200).json(responseFormatter(true, "User profile fetched successfully", user));
@@ -256,10 +213,19 @@ const getUserProfile = async (req, res) => {
         res.status(500).json(responseFormatter(false, "Server Error"));
     }
 };
+const getAllUsers = async (req, res) => {
+    try {
+        const users = await User.find().select("-password");
+        res.status(200).json(responseFormatter(true, "Users fetched successfully", users));
+    } catch (error) {
+        res.status(500).json(responseFormatter(false, "Server Error"));
+    }
+};
+
 
 const registerUser = async (req, res) => {
     try {
-        const { firstName, lastName, email, password, gender} = req.body;
+        const { firstName, lastName, email, password, gender,role} = req.body;
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json(responseFormatter(false, "User already exists"));
@@ -273,7 +239,7 @@ const registerUser = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email,
                 gender: user.gender,
-                token: generateToken(user._id)
+                role: user.role,
             }));
         } else {
             res.status(400).json(responseFormatter(false, "Invalid user data"));
@@ -293,6 +259,8 @@ const loginUser = async (req, res) => {
                 lastName: user.lastName,
                 email: user.email,
                 gender: user.gender,
+                id: user._id,
+                role: user.role,
                 token: generateToken(user._id, user.role)
             }));
         } else {
@@ -306,7 +274,8 @@ const loginUser = async (req, res) => {
 module.exports = {
     getUserProfile,
     registerUser,
-    loginUser
+    loginUser,
+    getAllUsers
 };
 
 
@@ -399,6 +368,16 @@ module.exports = {
 
 
 ================================================================================
+FILE PATH: middleware\roleStatus.middleware.js
+================================================================================
+const express = require('express');
+const rouleStatus=(req,res,next)=>{
+    
+}
+
+
+
+================================================================================
 FILE PATH: middleware\rouleStatus.middleware.js
 ================================================================================
 const jwt = require('jsonwebtoken');
@@ -483,14 +462,15 @@ module.exports = { registerValidation };
 FILE PATH: models\diagnosis.model.js
 ================================================================================
 const mongoose = require("mongoose");
-
+//بحط النتيجه هنا بتاع المريض
 const diagnosisSchema = mongoose.Schema(
     {
         userId: {
-            type: mongoose.Schema.Types.ObjectId,
-            ref: 'User',
+            type: mongoose.Schema.Types.ObjectId,// دا خاص ب mongodb
+            ref: 'User',//بيربط الاعراض مع المستخدم
             required: true
         },
+        //دا ملف الاعراض الي اخترها المريض
         userSymptomsId: {
             type: mongoose.Schema.Types.ObjectId,
             ref: 'UserSymptoms',
@@ -507,6 +487,7 @@ const diagnosisSchema = mongoose.Schema(
             min: 0,
             max: 100
         },
+        //دي الاعراض الي موجوده عنده فقظ 1
         symptoms: {
             type: [String],
             required: true
@@ -658,7 +639,8 @@ FILE PATH: package.json
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node index.js",
+    "st": "nodemon index.js"
   },
   "dependencies": {
     "axios": "^1.13.2",
@@ -668,7 +650,8 @@ FILE PATH: package.json
     "express": "^5.1.0",
     "express-validator": "^7.3.1",
     "jsonwebtoken": "^9.0.2",
-    "mongoose": "^8.19.2"
+    "mongoose": "^8.19.2",
+    "nodemon": "^3.1.11"
   }
 }
 
@@ -724,7 +707,7 @@ const express = require('express');
 const router = express.Router();
 
 // Import controller
-const { getUserProfile, registerUser, loginUser } = require('../controller/user.controller');
+const { getUserProfile, registerUser, loginUser,getAllUsers } = require('../controller/user.controller');
 
 // Import validation middleware
 const { registerValidation } = require('../middleware/validation');
@@ -739,11 +722,33 @@ router.post('/register', registerValidation, registerUser);
 router.post('/login', loginUser);
 
 // GET route for user profile (protected)
-router.get('/profile', verifyToken, getUserProfile);
+router.get('/profile:id', verifyToken, getUserProfile);
+router.get('/profile', verifyToken, getAllUsers);
 
 module.exports = router;
 
 
+
+
+================================================================================
+FILE PATH: symptoms.json
+================================================================================
+[
+    
+    { "key": "back_pain", "name": "Back Pain", "description": "Pain in the back area" },
+    { "key": "swelling", "name": "Swelling", "description": "Abnormal swelling in body parts" },
+    { "key": "low_urine", "name": "Low Urine Output", "description": "Decreased urine production" },
+    { "key": "fever", "name": "Fever", "description": "Elevated body temperature" },
+    { "key": "blood_in_urine", "name": "Blood in Urine", "description": "Presence of blood in urine" },
+    { "key": "nausea", "name": "Nausea", "description": "Feeling of sickness with inclination to vomit" },
+    { "key": "vomiting", "name": "Vomiting", "description": "Forceful expulsion of stomach contents" },
+    { "key": "fatigue", "name": "Fatigue", "description": "Extreme tiredness or exhaustion" },
+    { "key": "loss_of_appetite", "name": "Loss of Appetite", "description": "Reduced desire to eat" },
+    { "key": "burning_urination", "name": "Burning Urination", "description": "Pain or burning sensation during urination" },
+    { "key": "dark_urine", "name": "Dark Urine", "description": "Unusually dark colored urine" },
+    { "key": "abdomen_pain", "name": "Abdomen Pain", "description": "Pain in the abdominal area" }
+    
+]
 
 
 ================================================================================

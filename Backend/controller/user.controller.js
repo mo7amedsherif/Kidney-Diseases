@@ -28,21 +28,22 @@ const getAllUsers = async (req, res) => {
 
 const registerUser = async (req, res) => {
     try {
-        const { firstName, lastName, email, password, gender,role} = req.body;
+        const { firstName, lastName, email, password, gender,role,age} = req.body;
         const userExists = await User.findOne({ email });
         if (userExists) {
             return res.status(400).json(responseFormatter(false, "User already exists"));
         }
         const salt = await bcrypt.genSalt(10);
         const hashedPassword = await bcrypt.hash(password, salt);
-        const user = await User.create({ firstName, lastName, email, password: hashedPassword, gender, role });
+        const user = await User.create({ firstName, lastName, email, password: hashedPassword, gender, role ,age});
         if (user) {
             res.status(201).json(responseFormatter(true, "User registered successfully", {
                 firstName: user.firstName,
                 lastName: user.lastName,
                 email: user.email,
+                age: user.age,
                 gender: user.gender,
-                token: generateToken(user._id)
+                role: user.role,
             }));
         } else {
             res.status(400).json(responseFormatter(false, "Invalid user data"));
@@ -77,6 +78,7 @@ const loginUser = async (req, res) => {
 module.exports = {
     getUserProfile,
     registerUser,
-    loginUser
+    loginUser,
+    getAllUsers
 };
 
