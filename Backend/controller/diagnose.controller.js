@@ -2,28 +2,32 @@ const UserSymptoms = require("../models/userSymptoms.model");
 const Diagnosis = require("../models/diagnosis.model");
 const responseFormatter = require("../utils/responseFormatter");
 const axios = require("axios");
+const mongoose = require("mongoose");
 
 const diagnoseDisease = async (req, res) => {
     try {
-        const { symptoms, additionalNotes } = req.body;
+        const  userSymptomsId = req.userSymptomsId;
         const userId = req.user.id;
-        const userSymptoms = await UserSymptoms.create({
-            userId,
-            symptoms,
-            additionalNotes: additionalNotes || ""
-        });
-        if (!userSymptoms) {
-            return res.status(500).json(
-                responseFormatter(false, "Failed to save symptoms")
+        if (!userSymptomsId) {
+            return res.status(400).json(
+                responseFormatter(false, "User symptoms ID is required for diagnosis")
             );
         }
+        const symptomsEntry = await UserSymptoms.findById(userSymptomsId);
+        if (!symptomsEntry) {
+            return res.status(404).json(
+                responseFormatter(false, "no symptoms found for the given ID")
+            );
+        }
+        const symptomsData = Object.fromEntries(symptomsEntry.symptoms);
+        const userSymptoms = symptomsEntry;
         let predictedDisease;
         let confidence;
         try {
             const mlApiResponse = await axios.post(
                 "http://127.0.0.1:5000/predict",
                 {
-                    symptoms: symptoms
+                    symptoms: symptomsData
                 },
                 {
                     timeout: 10000,
@@ -37,8 +41,7 @@ const diagnoseDisease = async (req, res) => {
                     mlApiResponse.data.predicted_disease ||
                     mlApiResponse.data.prediction;
                 confidence = mlApiResponse.data.confidence ||
-                    mlApiResponse.data.confidence_score ||
-                    0;
+                    mlApiResponse.data.confidence_score ||0;
             } else {
                 throw new Error("Invalid response from ML API: empty response");
             }
@@ -54,6 +57,7 @@ const diagnoseDisease = async (req, res) => {
                 })
             );
         }
+
         if (!predictedDisease || typeof predictedDisease !== 'string' || predictedDisease.trim() === '') {
             return res.status(500).json(
                 responseFormatter(false, "Invalid response from ML API: missing or invalid disease prediction")
@@ -65,6 +69,7 @@ const diagnoseDisease = async (req, res) => {
         } else {
             confidence = confidenceNum;
         }
+
         const activeSymptoms = Object.keys(symptoms).filter(key => symptoms[key] === 1);
         if (activeSymptoms.length === 0) {
             return res.status(400).json(
