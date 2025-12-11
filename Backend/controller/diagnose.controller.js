@@ -6,7 +6,7 @@ const mongoose = require("mongoose");
 
 const diagnoseDisease = async (req, res) => {
     try {
-        const  userSymptomsId = req.userSymptomsId;
+        const userSymptomsId = req.userSymptomsId;
         const userId = req.user.id;
         if (!userSymptomsId) {
             return res.status(400).json(
@@ -41,7 +41,7 @@ const diagnoseDisease = async (req, res) => {
                     mlApiResponse.data.predicted_disease ||
                     mlApiResponse.data.prediction;
                 confidence = mlApiResponse.data.confidence ||
-                    mlApiResponse.data.confidence_score ||0;
+                    mlApiResponse.data.confidence_score || 0;
             } else {
                 throw new Error("Invalid response from ML API: empty response");
             }
@@ -70,7 +70,7 @@ const diagnoseDisease = async (req, res) => {
             confidence = confidenceNum;
         }
 
-        const activeSymptoms = Object.keys(symptoms).filter(key => symptoms[key] === 1);
+        const activeSymptoms = Object.keys(symptomsData).filter(key => symptomsData[key] === 1);
         if (activeSymptoms.length === 0) {
             return res.status(400).json(
                 responseFormatter(false, "At least one active symptom (value = 1) is required for diagnosis")
