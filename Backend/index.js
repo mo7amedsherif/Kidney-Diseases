@@ -6,7 +6,9 @@ const userRoutes = require('./routes/user.routes');
 const diagnoseRoutes = require('./routes/diagnose.route');
 
 require('dotenv').config();
-app.use(cors());
+app.use(cors(
+    
+));
 app.use(express.json());
 connectDB();
 

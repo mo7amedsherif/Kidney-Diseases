@@ -1,5 +1,5 @@
 Project Structure & Code Dump
-Generated on: 2025-12-10T22:54:25.235Z
+Generated on: 2026-01-16T19:54:37.691Z
 
 
 ================================================================================
@@ -31,7 +31,7 @@ const mongoose = require("mongoose");
 
 const diagnoseDisease = async (req, res) => {
     try {
-        const  userSymptomsId = req.userSymptomsId;
+        const userSymptomsId = req.userSymptomsId;
         const userId = req.user.id;
         if (!userSymptomsId) {
             return res.status(400).json(
@@ -66,7 +66,7 @@ const diagnoseDisease = async (req, res) => {
                     mlApiResponse.data.predicted_disease ||
                     mlApiResponse.data.prediction;
                 confidence = mlApiResponse.data.confidence ||
-                    mlApiResponse.data.confidence_score ||0;
+                    mlApiResponse.data.confidence_score || 0;
             } else {
                 throw new Error("Invalid response from ML API: empty response");
             }
@@ -95,7 +95,7 @@ const diagnoseDisease = async (req, res) => {
             confidence = confidenceNum;
         }
 
-        const activeSymptoms = Object.keys(symptoms).filter(key => symptoms[key] === 1);
+        const activeSymptoms = Object.keys(symptomsData).filter(key => symptomsData[key] === 1);
         if (activeSymptoms.length === 0) {
             return res.status(400).json(
                 responseFormatter(false, "At least one active symptom (value = 1) is required for diagnosis")
@@ -286,7 +286,9 @@ const userRoutes = require('./routes/user.routes');
 const diagnoseRoutes = require('./routes/diagnose.route');
 
 require('dotenv').config();
-app.use(cors());
+app.use(cors(
+    
+));
 app.use(express.json());
 connectDB();
 
@@ -584,14 +586,14 @@ FILE PATH: routes\diagnose.route.js
 ================================================================================
 const express = require('express');
 const router = express.Router();
-const { verifyToken } = require('../middleware/rouleStatus.middleware');
+const { verifyToken ,verifyTokenAndAdmin} = require('../middleware/rouleStatus.middleware');
 const {symptomsValidation}=require('../middleware/symptoms.validation');
 const { diagnoseDisease, getDiagnosisHistory } = require('../controller/diagnose.controller');
 const {getSymptomsFromUser}=require('../controller/userSymptoms.controller');
 
 router.post('/', verifyToken, symptomsValidation,getSymptomsFromUser, diagnoseDisease);
 
-router.get('/history', verifyToken, getDiagnosisHistory);
+router.get('/history', verifyTokenAndAdmin, getDiagnosisHistory);
 
 module.exports = router;
 
@@ -603,26 +605,13 @@ FILE PATH: routes\user.routes.js
 ================================================================================
 const express = require('express');
 const router = express.Router();
-
-// Import controller
 const { getUserProfile, registerUser, loginUser,getAllUsers } = require('../controller/user.controller');
-
-// Import validation middleware
 const { registerValidation } = require('../middleware/register.validation');
-
-// Import authentication middleware
 const { verifyToken, verifyTokenAndAdmin } = require('../middleware/rouleStatus.middleware');
-
-// POST route for user registration
 router.post('/register', registerValidation, registerUser);
-
-// POST route for user login
 router.post('/login', loginUser);
-
-// GET route for user profile (protected)
 router.get('/profile/:id', verifyToken, getUserProfile);
 router.get('/profile', verifyTokenAndAdmin, getAllUsers);
-
 module.exports = router;
 
 
