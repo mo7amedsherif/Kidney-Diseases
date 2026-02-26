@@ -75,8 +75,8 @@ cd backend
 npm install
 # Create a .env file and add your MongoDB URI and JWT Secret
 npm start
-**3. Start the Python Flask Server (AI)**
 ```
+**3. Start the Python Flask Server (AI)**
 ```bash
 cd ai-service
 pip install -r requirements.txt
