@@ -82,7 +82,7 @@ cd ai-service
 pip install -r requirements.txt
 python app.py
 ```
-**Start the React Frontend**
+**4. Start the React Frontend**
 ```bash
 cd frontend
 npm install
