@@ -68,6 +68,7 @@ To run this project locally, you need to start the Frontend, the Node Backend, a
 ```bash
 git clone [https://github.com/mo7amedsherif/Kidney-Diseases.git](https://github.com/mo7amedsherif/Kidney-Diseases.git)
 cd Kidney-Diseases
+```
 **2. Start the Node.js Backend**
 ```bash
 cd backend
@@ -75,12 +76,15 @@ npm install
 # Create a .env file and add your MongoDB URI and JWT Secret
 npm start
 **3. Start the Python Flask Server (AI)**
+```
 ```bash
 cd ai-service
 pip install -r requirements.txt
 python app.py
+```
 **Start the React Frontend**
 ```bash
 cd frontend
 npm install
 npm start
+```
